@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Duo fold layout</title>
+<link rel="stylesheet" href="/fold.css">
+</head>
+<body class="min-h-dvh bg-slate-100 text-slate-900 font-mono text-[13px]">
+  <!-- One column by default. Two columns, one per segment, in book posture. -->
+  <div class="grid min-h-dvh grid-cols-1 book:grid-cols-segments tabletop:grid-rows-segments">
+
+    <section class="bg-sky-100 p-3 book:bg-sky-200 tabletop:bg-sky-300">
+      <h1 class="text-lg font-bold"><span class="book:hidden">Top</span><span class="hidden book:inline">Left</span> segment</h1>
+      <p class="mt-1">Book posture: left half. Tabletop posture: top half. Flat: first block.</p>
+      <p id="mode" class="mt-3 rounded bg-white p-2 font-bold">…</p>
+    </section>
+
+    <section class="bg-amber-100 p-3 book:bg-amber-200 tabletop:bg-amber-300">
+      <h1 class="text-lg font-bold"><span class="book:hidden">Bottom</span><span class="hidden book:inline">Right</span> segment</h1>
+      <p class="mt-1">Book posture: right half. Tabletop posture: bottom half. Flat: stacked below.</p>
+      <ul class="mt-3 space-y-1">
+        <li class="flat:font-bold">flat: bold when <code>device-posture: continuous</code></li>
+        <li class="book:font-bold">book: bold when folded with two segments</li>
+        <li class="tabletop:font-bold">tabletop: bold when folded with two stacked segments</li>
+        <li class="seg-x2:font-bold">seg2: bold when the viewport has two segments</li>
+      </ul>
+      <pre id="out" class="mt-3 whitespace-pre-wrap rounded bg-white p-2"></pre>
+    </section>
+  </div>
+
+<script>
+  const q = s => matchMedia(s).matches;
+  function state() {
+    const segs = window.viewport?.segments?.map(r => ({ x: r.x, y: r.y, w: r.width, h: r.height })) ?? null;
+    return {
+      src: new URLSearchParams(location.search).get('src') ?? 'phone',
+      page: 'fold',
+      viewport: { innerWidth, innerHeight },
+      posture: navigator.devicePosture?.type ?? 'missing',
+      segments: segs,
+      envSeg0: getComputedStyle(document.querySelector('section')).width,
+      media: { folded: q('(device-posture: folded)'), hseg2: q('(horizontal-viewport-segments: 2)'), book: q('(device-posture: folded) and (horizontal-viewport-segments: 2)'), tabletop: q('(device-posture: folded) and (vertical-viewport-segments: 2)') },
+    };
+  }
+  async function render(label) {
+    const s = state();
+    document.getElementById('mode').textContent = `${s.viewport.innerWidth}×${s.viewport.innerHeight}  posture=${s.posture}  book=${s.media.book} tabletop=${s.media.tabletop}`;
+    document.getElementById('out').textContent = JSON.stringify(s, null, 1);
+    try {
+      await fetch('/report', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ label, ...s, safeArea: {}, apis: {}, media: s.media, secureContext: isSecureContext, userAgent: navigator.userAgent }) });
+    } catch {}
+  }
+  let t; // The posture event fires before media queries and segments update, so measure twice.
+  const changed = () => { clearTimeout(t); t = setTimeout(() => { render('fold-auto'); setTimeout(() => render('fold-settled'), 700); }, 300); };
+  addEventListener('resize', changed);
+  navigator.devicePosture?.addEventListener('change', changed);
+  render('fold-load');
+
+  let seen;
+  setInterval(async () => {
+    try { const { version } = await (await fetch('/version', { cache: 'no-store' })).json(); if (seen && version !== seen) location.reload(); seen = version; } catch {}
+  }, 1000);
+</script>
+</body>
+</html>

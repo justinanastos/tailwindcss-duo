@@ -1,0 +1,9 @@
+node_modules
+test/.tmp-*
+# demo: generated or private
+demo/public/fold.css
+demo/reports.jsonl
+demo/latest.json
+demo/certs/
+demo/*.log
+.DS_Store

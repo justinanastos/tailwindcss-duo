@@ -1,0 +1,1 @@
+{ "name": "tailwindcss-duo-demo", "private": true, "type": "module", "scripts": { "build": "tailwindcss -i src/fold.css -o public/fold.css", "start": "node server.mjs" }, "devDependencies": { "@tailwindcss/cli": "^4.0.0", "tailwindcss": "^4.0.0" } }

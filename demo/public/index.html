@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta id="vp" name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+  // ?fit=auto drops viewport-fit=cover so we can compare the two.
+  const FIT = new URLSearchParams(location.search).get('fit') === 'auto' ? 'auto' : 'cover';
+  document.getElementById('vp').content = 'width=device-width, initial-scale=1' + (FIT === 'cover' ? ', viewport-fit=cover' : '');
+</script>
+<title>Duo lab</title>
+<style>
+  :root {
+    --l: env(safe-area-inset-left, 0px);
+    --r: env(safe-area-inset-right, 0px);
+    --t: env(safe-area-inset-top, 0px);
+    --b: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100dvh; }
+  body {
+    font: 13px/1.35 ui-monospace, Menlo, monospace;
+    color: #111;
+    /* Checkerboard so anything drawn under the controls is obvious. */
+    background: repeating-conic-gradient(#ffe9a8 0 25%, #fff6d6 0 50%) 0 0 / 20px 20px;
+  }
+
+  /* Safe-area strips: red where env() says the system covers the page. */
+  .inset { position: fixed; background: rgb(255 0 0 / .35); pointer-events: none; z-index: 5; }
+  .inset.l { left: 0; top: 0; bottom: 0; width: var(--l); }
+  .inset.r { right: 0; top: 0; bottom: 0; width: var(--r); }
+  .inset.t { left: 0; right: 0; top: 0; height: var(--t); }
+  .inset.b { left: 0; right: 0; bottom: 0; height: var(--b); }
+
+  /* Edge rulers: numbers are px from that edge. Tell Claude the smallest number you can see. */
+  .ruler { position: fixed; pointer-events: none; z-index: 6; font-size: 9px; color: #fff; }
+  .ruler span { position: absolute; background: #0057ff; padding: 0 2px; white-space: nowrap; }
+  .ruler.r { right: 0; top: 50%; } .ruler.l { left: 0; top: 50%; }
+  .ruler.t { top: 0; left: 50%; } .ruler.b { bottom: 0; left: 50%; }
+  .edge { position: fixed; z-index: 7; pointer-events: none; }
+  .edge.l { left: 0; top: 0; bottom: 0; width: 2px; background: lime; }
+  .edge.r { right: 0; top: 0; bottom: 0; width: 2px; background: magenta; }
+  .edge.t { top: 0; left: 0; right: 0; height: 2px; background: cyan; }
+  .edge.b { bottom: 0; left: 0; right: 0; height: 2px; background: orange; }
+
+  /* Crease guess at 50%, and real segments when the API exists. */
+  .crease { position: fixed; top: 0; bottom: 0; left: 50%; border-left: 1px dashed #c00; z-index: 4; pointer-events: none; }
+  .seg { position: fixed; outline: 3px solid #7a00ff; z-index: 4; pointer-events: none; }
+
+  main {
+    position: relative; z-index: 10;
+    padding: max(12px, var(--t)) max(12px, var(--r)) max(12px, var(--b)) max(12px, var(--l));
+  }
+  .panel { background: rgb(255 255 255 / .92); border: 1px solid #0002; border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+  .big { font-size: 22px; font-weight: 700; }
+  pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+  .poses { display: flex; flex-wrap: wrap; gap: 6px; }
+  button, a.btn { font: inherit; font-size: 14px; min-height: 44px; padding: 0 12px; border-radius: 8px; border: 1px solid #0003; background: #fff; color: #111; text-decoration: none; display: inline-flex; align-items: center; }
+  button:active { background: #dde8ff; }
+  #status { color: #070; }
+
+  /* Unit probes, measured by JS. */
+  .probe { position: absolute; visibility: hidden; width: 1px; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="inset l"></div><div class="inset r"></div><div class="inset t"></div><div class="inset b"></div>
+<div class="edge l"></div><div class="edge r"></div><div class="edge t"></div><div class="edge b"></div>
+<div class="ruler l"></div><div class="ruler r"></div><div class="ruler t"></div><div class="ruler b"></div>
+<div class="crease"></div>
+<div id="segs"></div>
+
+<main>
+  <div class="panel">
+    <div class="big" id="headline">…</div>
+    <div id="status">not sent yet</div>
+  </div>
+  <div class="panel">
+    <div style="margin-bottom:6px">Tap the pose you are in. Each tap sends a labeled snapshot.</div>
+    <div class="poses" id="poses"></div>
+    <div style="margin-top:8px" class="poses">
+      <a class="btn" id="fitlink"></a>
+      <button id="send">send snapshot</button>
+    </div>
+  </div>
+  <div class="panel"><pre id="out"></pre></div>
+</main>
+
+<div class="probe" id="p-dvh" style="height:100dvh"></div>
+<div class="probe" id="p-svh" style="height:100svh"></div>
+<div class="probe" id="p-lvh" style="height:100lvh"></div>
+<div class="probe" id="p-vh" style="height:100vh"></div>
+<div class="probe" id="p-vw" style="width:100vw;height:1px"></div>
+<div class="probe" id="p-rem" style="height:1rem"></div>
+<div class="probe" id="p-inset" style="padding: env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)"></div>
+
+<script>
+const POSES = ['closed portrait', 'closed landscape', 'open portrait', 'open landscape', 'split view', 'book (half fold)', 'tabletop (half fold)'];
+const $ = id => document.getElementById(id);
+
+const h = id => $(id).getBoundingClientRect().height;
+const mq = q => matchMedia(q).matches;
+
+// The px value of 1em inside media queries. Can differ from the root font size.
+function mediaEm() {
+  let lo = 0, hi = 200;
+  for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; mq(`(min-width: ${mid}em)`) ? lo = mid : hi = mid; }
+  return lo ? +(innerWidth / lo).toFixed(2) : null;
+}
+
+function measure() {
+  const ins = getComputedStyle($('p-inset'));
+  const vv = visualViewport;
+  const segs = window.viewport?.segments;
+  return {
+    src: new URLSearchParams(location.search).get('src') ?? 'phone',
+    fit: FIT,
+    secureContext: isSecureContext,
+    userAgent: navigator.userAgent,
+    viewport: {
+      innerWidth, innerHeight,
+      clientWidth: document.documentElement.clientWidth, clientHeight: document.documentElement.clientHeight,
+      visual: vv && { width: vv.width, height: vv.height, offsetLeft: vv.offsetLeft, offsetTop: vv.offsetTop, scale: vv.scale },
+      screen: { width: screen.width, height: screen.height, availWidth: screen.availWidth, availHeight: screen.availHeight },
+      orientation: screen.orientation && `${screen.orientation.type} ${screen.orientation.angle}`,
+      dpr: devicePixelRatio,
+    },
+    units: { '100vw': $('p-vw').getBoundingClientRect().width, '100vh': h('p-vh'), '100dvh': h('p-dvh'), '100svh': h('p-svh'), '100lvh': h('p-lvh'), '1rem': h('p-rem'), mediaQueryEm: mediaEm() },
+    safeArea: { top: parseFloat(ins.paddingTop), right: parseFloat(ins.paddingRight), bottom: parseFloat(ins.paddingBottom), left: parseFloat(ins.paddingLeft) },
+    media: {
+      portrait: mq('(orientation: portrait)'),
+      hover: mq('(hover: hover)'), pointerCoarse: mq('(pointer: coarse)'), anyPointerFine: mq('(any-pointer: fine)'),
+      'tw sm 40rem': mq('(min-width: 40rem)'), 'tw md 48rem': mq('(min-width: 48rem)'), 'tw lg 64rem': mq('(min-width: 64rem)'),
+      'sm 640px': mq('(min-width: 640px)'), 'md 768px': mq('(min-width: 768px)'), 'lg 1024px': mq('(min-width: 1024px)'),
+      'device-posture: folded': mq('(device-posture: folded)'), 'device-posture: continuous': mq('(device-posture: continuous)'),
+      'horizontal-viewport-segments: 2': mq('(horizontal-viewport-segments: 2)'), 'vertical-viewport-segments: 2': mq('(vertical-viewport-segments: 2)'),
+      darkMode: mq('(prefers-color-scheme: dark)'),
+    },
+    apis: {
+      devicePosture: 'devicePosture' in navigator ? navigator.devicePosture.type : 'missing',
+      viewportSegments: window.viewport ? (segs ? segs.map(r => ({ x: r.x, y: r.y, w: r.width, h: r.height })) : null) : 'missing',
+    },
+  };
+}
+
+function rulers() {
+  const marks = n => Array.from({ length: Math.ceil(n / 10) + 1 }, (_, i) => i * 10);
+  const maxW = innerWidth / 2, maxH = innerHeight / 2;
+  $('segs').innerHTML = '';
+  document.querySelector('.ruler.r').innerHTML = marks(Math.min(120, maxW)).map(d => `<span style="right:${d}px;top:${(d / 10 % 3) * 12}px">${d}</span>`).join('');
+  document.querySelector('.ruler.l').innerHTML = marks(Math.min(120, maxW)).map(d => `<span style="left:${d}px;top:${(d / 10 % 3) * 12}px">${d}</span>`).join('');
+  document.querySelector('.ruler.t').innerHTML = marks(Math.min(80, maxH)).map(d => `<span style="top:${d}px;left:${(d / 10 % 3) * 22}px">${d}</span>`).join('');
+  document.querySelector('.ruler.b').innerHTML = marks(Math.min(80, maxH)).map(d => `<span style="bottom:${d}px;left:${(d / 10 % 3) * 22}px">${d}</span>`).join('');
+  const segs = window.viewport?.segments;
+  if (segs) $('segs').innerHTML = segs.map(r => `<div class="seg" style="left:${r.x}px;top:${r.y}px;width:${r.width}px;height:${r.height}px"></div>`).join('');
+}
+
+let last;
+function render() {
+  last = measure();
+  const s = last.safeArea;
+  $('headline').textContent = `${innerWidth} × ${innerHeight}  insets T${s.top} R${s.right} B${s.bottom} L${s.left}  fit=${FIT}`;
+  $('out').textContent = JSON.stringify(last, null, 2);
+  rulers();
+}
+
+async function send(label) {
+  render();
+  try {
+    const r = await fetch('/report', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ label, ...last }) });
+    const { n } = await r.json();
+    $('status').textContent = `sent #${n} ${label} ✓`;
+  } catch (e) {
+    $('status').textContent = `send failed: ${e}`;
+  }
+}
+
+$('poses').innerHTML = POSES.map(p => `<button data-pose="${p}">${p}</button>`).join('');
+$('poses').addEventListener('click', e => { const p = e.target.dataset.pose; if (p) send(p); });
+$('send').onclick = () => send('manual');
+$('fitlink').textContent = FIT === 'cover' ? 'switch to fit=auto' : 'switch to fit=cover';
+$('fitlink').href = FIT === 'cover' ? '?fit=auto' : '?fit=cover';
+
+// Auto-report on every shape change, debounced, so a fold shows up in the log without a tap.
+let timer;
+const changed = () => { clearTimeout(timer); timer = setTimeout(() => send('auto'), 500); };
+addEventListener('resize', changed);
+visualViewport?.addEventListener('resize', changed);
+screen.orientation?.addEventListener('change', changed);
+navigator.devicePosture?.addEventListener('change', changed);
+
+render();
+send('load');
+
+// Live reload when Claude edits the page. Show a banner while the server is unreachable.
+let seen, down = false;
+setInterval(async () => {
+  try {
+    const { version } = await (await fetch('/version', { cache: 'no-store' })).json();
+    if (down) { down = false; $('status').textContent = 'lab server back'; $('status').style.color = ''; }
+    if (seen && version !== seen) location.reload();
+    seen = version;
+  } catch {
+    down = true; $('status').textContent = '⚠ lab server unreachable, retrying…'; $('status').style.color = '#c00';
+  }
+}, 1000);
+</script>
+</body>
+</html>
