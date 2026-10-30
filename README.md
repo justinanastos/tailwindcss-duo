@@ -53,7 +53,7 @@ The two Safari feature flags are off. Turn them on at Settings > Apps > Safari >
 ## Things to know
 
 - **No segment height utility.** iOS 27.2 reported 2242, 650, 673.5 and 475.5 for the same pose. Width and start position are stable, so the plugin uses only those.
-- **Late values.** The posture event fires before the media queries settle. CSS follows on its own. JavaScript that reads `navigator.devicePosture` or `window.viewport.segments` should read again about 700 ms after the event.
+- **Late JavaScript values.** Right after a fold, `navigator.devicePosture.type` is correct, but `matchMedia` and `window.viewport.segments` were stale and became correct about 1 s later. Read them again after a delay. When the CSS itself flips was not measured.
 - **Safe areas need `viewport-fit=cover`** in the viewport meta tag. On the closed screen all insets are 0. On the open screen the bottom inset is 34.
 - **Demo pages with `@tailwindcss/browser`** cannot `@import` a plugin. Use the Tailwind CLI or Vite.
 

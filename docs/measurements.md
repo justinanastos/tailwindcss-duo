@@ -26,6 +26,6 @@ Both need the Safari feature flags "Device Posture API" and "Viewport Segments A
 | Portrait, half fold (about 92°) | `folded` | 2 stacked, second starts at y = 343.5 |
 
 - A half fold sends no `resize` event. Use the posture `change` event.
-- That event fires before media queries and segments update. Read again about 700 ms later.
+- Right after that event, `devicePosture.type` is correct. `matchMedia` and segments were stale and became correct about 1 s later. When the CSS itself flips was not measured.
 - Segment height is unreliable. One pose gave 2242, 650, 673.5 and 475.5 on different runs. Width and start position were stable.
 - In portrait the top segment is shorter than the bottom one, because Safari's toolbar covers the top of the screen.
