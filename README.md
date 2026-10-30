@@ -5,7 +5,7 @@ Tailwind CSS 4 plugin for the iPhone Duo. Pure CSS. No JavaScript.
 ## How do I install it?
 
 ```bash
-npm install github:justinanastos/tailwindcss-duo#v0.1.0
+npm install github:justinanastos/tailwindcss-duo#v0.1.1
 ```
 
 Then add one line to your CSS:
@@ -15,7 +15,7 @@ Then add one line to your CSS:
 @import "tailwindcss-duo";
 ```
 
-The `#v0.1.0` part pins a git tag. This package is not on npm.
+The `#v0.1.1` part pins a git tag. This package is not on npm.
 
 ## What do I get?
 

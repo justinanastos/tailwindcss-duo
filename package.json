@@ -1,6 +1,6 @@
 {
   "name": "tailwindcss-duo",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Tailwind CSS 4 plugin for the iPhone Duo: posture and viewport-segment variants, segment layout helpers, safe-area padding. Pure CSS.",
   "license": "MIT",
   "style": "index.css",

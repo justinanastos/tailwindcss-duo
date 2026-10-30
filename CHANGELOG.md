@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- Docs: corrected the timing note. Right after a fold, `devicePosture.type` is correct, and `matchMedia` and `window.viewport.segments` lag about 1 s. When the CSS flips was not measured.
+
 ## 0.1.0
 
 - Variants: `flat:`, `folded:`, `book:`, `tabletop:`, `seg-x2:`, `seg-y2:`.
